@@ -46,6 +46,11 @@ export const storage = {
     ]);
   },
 
+  async claimFreeTrial(userId: string): Promise<void> {
+    // 테스트 모드: 무제한(9999 크레딧) 지급
+    await query("UPDATE users SET credits = 9999 WHERE id = $1", [userId]);
+  },
+
   async getActiveSubscription(userId: string) {
     const user = await this.getUser(userId);
     if (!user?.stripe_customer_id) return null;

@@ -42,7 +42,9 @@ export default function PricingScreen() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [claimingTrial, setClaimingTrial] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trialClaimed, setTrialClaimed] = useState(false);
 
   const apiUrl =
     process.env.EXPO_PUBLIC_API_URL ||
@@ -90,6 +92,29 @@ export default function PricingScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleFreeTrial = useCallback(async () => {
+    setClaimingTrial(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      if (!token) { router.replace("/login"); return; }
+
+      const res = await fetch(`${apiUrl}/api/user/free-trial`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error || "무료 체험 적용에 실패했습니다.");
+
+      setTrialClaimed(true);
+      await loadData();
+    } catch (e: any) {
+      setError(e.message || "오류가 발생했습니다.");
+    } finally {
+      setClaimingTrial(false);
+    }
+  }, [apiUrl, getToken, loadData]);
 
   const handlePurchase = useCallback(async (plan: Plan) => {
     setPurchasing(plan.price_id);
@@ -181,6 +206,46 @@ export default function PricingScreen() {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
+
+        {/* Free Trial Card */}
+        {!userInfo?.hasActiveSubscription && (
+          <View style={[styles.trialCard, { backgroundColor: "#F0FFF4", borderColor: "#86EFAC" }]}>
+            <View style={styles.trialHeader}>
+              <Ionicons name="gift" size={22} color="#16A34A" />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={[styles.trialTitle, { color: "#15803D" }]}>무료 체험하기</Text>
+                <Text style={[styles.trialDesc, { color: "#16A34A" }]}>
+                  3번 한정 무료 체험 • 지금 바로 시작하세요
+                </Text>
+              </View>
+            </View>
+            {trialClaimed ? (
+              <View style={[styles.trialBtn, { backgroundColor: "#86EFAC" }]}>
+                <Ionicons name="checkmark-circle" size={18} color="#15803D" />
+                <Text style={[styles.trialBtnText, { color: "#15803D", marginLeft: 6 }]}>적용 완료!</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.trialBtn, { backgroundColor: "#16A34A" }]}
+                onPress={handleFreeTrial}
+                disabled={claimingTrial}
+              >
+                {claimingTrial ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.trialBtnText, { color: "#fff" }]}>무료 체험 시작</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Divider */}
+        <View style={styles.divider}>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>또는 요금제 선택</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        </View>
 
         {/* Plans */}
         {plans.length === 0 ? (
@@ -316,4 +381,20 @@ const styles = StyleSheet.create({
   },
   planBtnText: { fontSize: 15, fontWeight: "700" },
   disclaimer: { fontSize: 12, textAlign: "center", marginTop: 16, lineHeight: 18 },
+  trialCard: {
+    borderWidth: 1.5, borderRadius: 20, padding: 20, marginBottom: 16,
+  },
+  trialHeader: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
+  trialTitle: { fontSize: 16, fontWeight: "700" },
+  trialDesc: { fontSize: 13, marginTop: 2 },
+  trialBtn: {
+    borderRadius: 12, padding: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+  },
+  trialBtnText: { fontSize: 15, fontWeight: "700" },
+  divider: {
+    flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 8,
+  },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12 },
 });
