@@ -150,9 +150,12 @@ export default function HomeScreen() {
       const symptomStr = symptoms.join(", ");
       if (symptomStr) formData.append("symptom", symptomStr);
 
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const baseUrl = domain ? `https://${domain}` : "";
-      const res = await fetch(`${baseUrl}/api/skin/analyze`, {
+      const apiUrl =
+        process.env.EXPO_PUBLIC_API_URL ||
+        (process.env.EXPO_PUBLIC_DOMAIN
+          ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+          : "");
+      const res = await fetch(`${apiUrl}/api/skin/analyze`, {
         method: "POST",
         body: formData,
       });

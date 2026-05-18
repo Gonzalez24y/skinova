@@ -4,10 +4,21 @@ import OpenAI from "openai";
 
 const router = Router();
 
-const openai = new OpenAI({
-  baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
-  apiKey: process.env["AI_INTEGRATIONS_OPENAI_API_KEY"],
-});
+function createOpenAIClient(): OpenAI {
+  const replitBase = process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"];
+  const replitKey = process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+  const standardKey = process.env["OPENAI_API_KEY"];
+
+  if (replitBase && replitKey) {
+    return new OpenAI({ baseURL: replitBase, apiKey: replitKey });
+  }
+  if (standardKey) {
+    return new OpenAI({ apiKey: standardKey });
+  }
+  throw new Error(
+    "OpenAI API 키가 설정되지 않았습니다. OPENAI_API_KEY 환경변수를 설정하세요."
+  );
+}
 
 router.post("/analyze", async (req: Request, res: Response) => {
   try {
@@ -19,6 +30,17 @@ router.post("/analyze", async (req: Request, res: Response) => {
       return;
     }
 
+    let openai: OpenAI;
+    try {
+      openai = createOpenAIClient();
+    } catch (e) {
+      req.log.error({ err: e }, "OpenAI client init failed");
+      res.status(500).json({
+        error: "서버 설정 오류: OPENAI_API_KEY 환경변수를 설정하세요.",
+      });
+      return;
+    }
+
     const base64 = file.buffer.toString("base64");
     const mimeType = file.mimetype || "image/jpeg";
 
@@ -26,8 +48,10 @@ router.post("/analyze", async (req: Request, res: Response) => {
       ? `사용자가 보고한 주요 증상: "${symptom}". 이를 분석에 반영하세요.`
       : "";
 
+    const model = process.env["OPENAI_MODEL"] ?? "gpt-4o";
+
     const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
+      model,
       max_completion_tokens: 1024,
       response_format: { type: "json_object" },
       messages: [
