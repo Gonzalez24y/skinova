@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { fetch } from "expo/fetch";
 import { File } from "expo-file-system";
+import { useAuth, useUser, useClerk } from "@clerk/expo";
+import { router } from "expo-router";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -42,12 +44,33 @@ const SYMPTOMS = [
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [step, setStep] = useState<Step>("landing");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const apiUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+
+  // Sync user to DB when signed in
+  useEffect(() => {
+    if (isSignedIn && user) {
+      getToken().then((token) => {
+        if (!token) return;
+        fetch(`${apiUrl}/api/user/sync`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.primaryEmailAddress?.emailAddress || "" }),
+        }).catch(() => {});
+      });
+    }
+  }, [isSignedIn, user]);
 
   const transitionTo = useCallback(
     (next: Step) => {
@@ -133,10 +156,17 @@ export default function HomeScreen() {
 
   const startAnalysis = useCallback(async () => {
     if (!imageUri) return;
+
+    if (!isSignedIn) {
+      router.push("/login");
+      return;
+    }
+
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     transitionTo("loading");
 
     try {
+      const token = await getToken();
       const formData = new FormData();
       if (Platform.OS === "web") {
         const response = await fetch(imageUri);
@@ -150,17 +180,23 @@ export default function HomeScreen() {
       const symptomStr = symptoms.join(", ");
       if (symptomStr) formData.append("symptom", symptomStr);
 
-      const apiUrl =
-        process.env.EXPO_PUBLIC_API_URL ||
-        (process.env.EXPO_PUBLIC_DOMAIN
-          ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-          : "");
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch(`${apiUrl}/api/skin/analyze`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
-      const data = await res.json() as AnalysisResult | { error: string };
+      const data = await res.json() as AnalysisResult | { error: string; code?: string };
+
+      if (res.status === 402) {
+        setError("진단 횟수가 부족합니다. 요금제를 구매해주세요.");
+        transitionTo("landing");
+        setTimeout(() => router.push("/pricing"), 500);
+        return;
+      }
 
       if (!res.ok) {
         throw new Error((data as { error: string }).error || "분석에 실패했습니다.");
@@ -172,7 +208,7 @@ export default function HomeScreen() {
       setError(e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.");
       transitionTo("landing");
     }
-  }, [imageUri, symptoms, transitionTo]);
+  }, [imageUri, symptoms, transitionTo, isSignedIn, getToken, apiUrl]);
 
   const handleReset = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -204,6 +240,31 @@ export default function HomeScreen() {
               { paddingTop: topInset + 20, paddingBottom: bottomInset + 20 },
             ]}
           >
+            {/* User bar */}
+            {isSignedIn ? (
+              <View style={styles.userBar}>
+                <Text style={[styles.userEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {user?.primaryEmailAddress?.emailAddress || "로그인됨"}
+                </Text>
+                <View style={styles.userActions}>
+                  <TouchableOpacity onPress={() => router.push("/pricing")} style={[styles.userChip, { backgroundColor: colors.terraLight }]}>
+                    <MaterialCommunityIcons name="crown" size={13} color={colors.terra} />
+                    <Text style={[styles.userChipText, { color: colors.terra }]}>요금제</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => signOut()} style={[styles.userChip, { backgroundColor: colors.muted }]}>
+                    <Ionicons name="log-out-outline" size={13} color={colors.mutedForeground} />
+                    <Text style={[styles.userChipText, { color: colors.mutedForeground }]}>로그아웃</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => router.push("/login")} style={[styles.loginBanner, { backgroundColor: colors.terraLight, borderColor: colors.terra }]}>
+                <Ionicons name="person-circle-outline" size={18} color={colors.terra} />
+                <Text style={[styles.loginBannerText, { color: colors.terra }]}>로그인 / 회원가입</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.terra} />
+              </TouchableOpacity>
+            )}
+
             <View style={styles.heroSection}>
               <View
                 style={[
@@ -677,6 +738,27 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  userBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 4,
+    marginBottom: 12,
+  },
+  userEmail: { fontSize: 12, flex: 1, marginRight: 8 },
+  userActions: { flexDirection: "row", gap: 6 },
+  userChip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
+  },
+  userChipText: { fontSize: 12, fontWeight: "600" },
+  loginBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    width: "100%", marginBottom: 12,
+  },
+  loginBannerText: { flex: 1, fontSize: 14, fontWeight: "600" },
   container: {
     flex: 1,
   },
