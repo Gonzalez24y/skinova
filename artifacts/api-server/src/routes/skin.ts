@@ -29,10 +29,7 @@ router.post("/analyze", async (req: Request, res: Response) => {
       return;
     }
 
-    const subscription = await storage.getActiveSubscription(userId);
-    const hasAccess = !!subscription || user.credits > 0;
-
-    if (!hasAccess) {
+    if (user.credits <= 0) {
       res.status(402).json({
         error: "진단 횟수가 부족합니다. 요금제를 구매해주세요.",
         code: "PAYMENT_REQUIRED",
@@ -106,8 +103,8 @@ disease: 주요 피부 상태, severity: 1(경미)~5(심각), needsHospital: 심
       return;
     }
 
-    // Deduct credit only if no subscription
-    if (!subscription && user.credits > 0) {
+    // 크레딧이 9999(무제한)가 아닌 경우에만 차감
+    if (user.credits < 9999) {
       await storage.decrementCredit(userId);
     }
 

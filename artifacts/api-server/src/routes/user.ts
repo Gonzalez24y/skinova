@@ -30,11 +30,9 @@ router.get("/me", async (req: Request, res: Response) => {
     return;
   }
 
-  const subscription = await storage.getActiveSubscription(userId);
   res.json({
     ...user,
-    hasActiveSubscription: !!subscription,
-    subscription,
+    hasActiveSubscription: user.credits >= 9999,
   });
 });
 
