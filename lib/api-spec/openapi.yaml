@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Skinova AI 피부 진단 API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: user
+    description: User operations
+  - name: skin
+    description: Skin analysis operations
+  - name: payment
+    description: Payment operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,184 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /user/sync:
+    post:
+      operationId: syncUser
+      tags: [user]
+      summary: Sync user with backend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        "200":
+          description: User synced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /user/me:
+    get:
+      operationId: getMe
+      tags: [user]
+      summary: Get current user info
+      responses:
+        "200":
+          description: User info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserWithSubscription"
+        "401":
+          description: Unauthorized
+
+  /user/free-trial:
+    post:
+      operationId: claimFreeTrial
+      tags: [user]
+      summary: Claim free trial (9999 credits)
+      responses:
+        "200":
+          description: Free trial claimed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  credits:
+                    type: integer
+
+  /skin/analyze:
+    post:
+      operationId: analyzeSkin
+      tags: [skin]
+      summary: Analyze skin from image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                symptom:
+                  type: string
+              required:
+                - image
+      responses:
+        "200":
+          description: Skin analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkinAnalysisResult"
+        "401":
+          description: Not logged in
+        "402":
+          description: Insufficient credits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+
+  /payment/plans:
+    get:
+      operationId: getPaymentPlans
+      tags: [payment]
+      summary: Get available payment plans and bank info
+      responses:
+        "200":
+          description: Plans and bank info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlansResponse"
+
+  /payment/request:
+    post:
+      operationId: requestPayment
+      tags: [payment]
+      summary: Request a payment (bank transfer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                planType:
+                  type: string
+                  enum: [single, monthly]
+              required:
+                - planType
+      responses:
+        "200":
+          description: Payment request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequestResponse"
+
+  /payment/confirm/{requestId}:
+    post:
+      operationId: confirmPayment
+      tags: [payment]
+      summary: Confirm payment has been made
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment confirmed and credits added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  credits:
+                    type: integer
+                  message:
+                    type: string
+
+  /payment/my-requests:
+    get:
+      operationId: getMyPaymentRequests
+      tags: [payment]
+      summary: Get current user's payment requests
+      responses:
+        "200":
+          description: List of payment requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PaymentRequest"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +217,139 @@ components:
       required:
         - status
 
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        credits:
+          type: integer
+        created_at:
+          type: string
+      required:
+        - id
+        - credits
+
+    UserWithSubscription:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            hasActiveSubscription:
+              type: boolean
+          required:
+            - hasActiveSubscription
+
+    SkinAnalysisResult:
+      type: object
+      properties:
+        disease:
+          type: string
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 5
+        description:
+          type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        needsHospital:
+          type: boolean
+        hospitalReason:
+          type: string
+      required:
+        - disease
+        - severity
+        - description
+        - recommendations
+        - needsHospital
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        amount:
+          type: integer
+        credits:
+          type: integer
+      required:
+        - id
+        - name
+        - amount
+        - credits
+
+    BankInfo:
+      type: object
+      properties:
+        bank:
+          type: string
+        account:
+          type: string
+        holder:
+          type: string
+      required:
+        - bank
+        - account
+        - holder
+
+    PlansResponse:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+        bank:
+          $ref: "#/components/schemas/BankInfo"
+      required:
+        - plans
+        - bank
+
+    PaymentRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        plan_type:
+          type: string
+        amount:
+          type: integer
+        status:
+          type: string
+        created_at:
+          type: string
+      required:
+        - id
+        - plan_type
+        - amount
+        - status
+
+    PaymentRequestResponse:
+      type: object
+      properties:
+        request:
+          $ref: "#/components/schemas/PaymentRequest"
+        bank:
+          $ref: "#/components/schemas/BankInfo"
+        plan:
+          type: object
+          properties:
+            name:
+              type: string
+            amount:
+              type: integer
+        message:
+          type: string
+      required:
+        - request
+        - bank
+        - message
