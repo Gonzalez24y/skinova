@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { SkinAnalysisResult } from "@workspace/api-client-react/src/generated/api.schemas";
-import { Loader2, UploadCloud, AlertCircle, CheckCircle2, ImagePlus } from "lucide-react";
+import { Loader2, UploadCloud, AlertCircle, CheckCircle2, ImagePlus, Camera } from "lucide-react";
 import { Layout } from "@/components/layout";
+import FaceCamera from "@/components/FaceCamera";
 
-type Step = "upload" | "symptoms" | "analyzing" | "result";
+type Step = "upload" | "camera" | "symptoms" | "analyzing" | "result";
 
 const SYMPTOMS_LIST = [
   { id: "acne", label: "여드름" },
@@ -40,6 +41,12 @@ export default function Home() {
       setPreviewUrl(URL.createObjectURL(file));
       setStep("symptoms");
     }
+  };
+
+  const handleCameraCapture = (file: File, preview: string) => {
+    setSelectedFile(file);
+    setPreviewUrl(preview);
+    setStep("symptoms");
   };
 
   const toggleSymptom = (id: string) => {
@@ -126,12 +133,41 @@ export default function Home() {
               </p>
             </div>
 
-            <Card className="w-full max-w-xl border-dashed border-2 bg-card/50 hover:bg-card/80 transition-colors">
-              <CardContent className="p-12 flex flex-col items-center justify-center space-y-6">
+            {/* AI 얼굴 스캔 (메인) */}
+            <Card className="w-full max-w-xl border-2 border-primary/30 bg-gradient-to-b from-primary/5 to-card/80 hover:border-primary/50 transition-all cursor-pointer"
+              onClick={() => setStep("camera")}
+            >
+              <CardContent className="p-10 flex flex-col items-center justify-center space-y-5">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Camera size={32} strokeWidth={1.5} className="text-primary" />
+                </div>
                 <div className="space-y-2 text-center">
-                  <h3 className="text-xl font-medium">피부 사진 업로드</h3>
+                  <h3 className="text-xl font-medium">AI 얼굴 스캔</h3>
                   <p className="text-sm text-muted-foreground">
-                    자연광에서 화장기 없는 얼굴을 선명하게 찍어주세요.
+                    정면 · 왼쪽 · 오른쪽 3방향 자동 촬영으로<br />더 정밀한 피부 분석을 받으세요.
+                  </p>
+                </div>
+                <Button size="lg" className="rounded-full px-8 gap-2" data-testid="button-camera">
+                  <Camera size={18} />
+                  얼굴 스캔 시작
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* 구분선 */}
+            <div className="flex items-center gap-3 w-full max-w-xl">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">또는</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* 갤러리 업로드 (서브) */}
+            <Card className="w-full max-w-xl border-dashed border-2 bg-card/50 hover:bg-card/80 transition-colors">
+              <CardContent className="p-8 flex flex-col items-center justify-center space-y-4">
+                <div className="space-y-1 text-center">
+                  <h3 className="text-lg font-medium">갤러리에서 사진 선택</h3>
+                  <p className="text-xs text-muted-foreground">
+                    이미 찍어둔 사진이 있다면 업로드하세요.
                   </p>
                 </div>
                 <input
@@ -143,6 +179,7 @@ export default function Home() {
                   data-testid="input-file"
                 />
                 <Button
+                  variant="outline"
                   size="lg"
                   className="rounded-full px-8 gap-2"
                   onClick={() => fileInputRef.current?.click()}
@@ -158,6 +195,14 @@ export default function Home() {
               AI 기반 피부 분석 · 전문의 진단 대체 불가
             </p>
           </div>
+        )}
+
+        {/* ── CAMERA (FaceCamera fullscreen) ── */}
+        {step === "camera" && (
+          <FaceCamera
+            onCapture={handleCameraCapture}
+            onClose={() => setStep("upload")}
+          />
         )}
 
         {/* ── SYMPTOMS ── */}
