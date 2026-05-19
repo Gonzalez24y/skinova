@@ -4,6 +4,7 @@ import healthRouter from "./health";
 import skinRouter from "./skin";
 import userRouter from "./user";
 import paymentRouter from "./payment";
+import configRouter from "./config";
 
 const router: IRouter = Router();
 const upload = multer({
@@ -12,6 +13,7 @@ const upload = multer({
 });
 
 router.use(healthRouter);
+router.use(configRouter);
 router.use("/user", userRouter);
 router.use("/payment", paymentRouter);
 router.use("/skin", upload.single("image"), skinRouter);
