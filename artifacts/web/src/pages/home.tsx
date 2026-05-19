@@ -1,15 +1,15 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { SkinAnalysisResult } from "@workspace/api-client-react/src/generated/api.schemas";
-import { Loader2, UploadCloud, AlertCircle, CheckCircle2, ImagePlus, Camera } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Camera } from "lucide-react";
 import { Layout } from "@/components/layout";
 import FaceCamera from "@/components/FaceCamera";
 
-type Step = "upload" | "camera" | "symptoms" | "analyzing" | "result";
+type Step = "home" | "camera" | "symptoms" | "analyzing" | "result";
 
 const SYMPTOMS_LIST = [
   { id: "acne", label: "여드름" },
@@ -26,22 +26,11 @@ export default function Home() {
   const { isSignedIn, getToken } = useAuth();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<Step>("upload");
+  const [step, setStep] = useState<Step>("home");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [result, setResult] = useState<SkinAnalysisResult | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setStep("symptoms");
-    }
-  };
 
   const handleCameraCapture = (file: File, preview: string) => {
     setSelectedFile(file);
@@ -110,30 +99,29 @@ export default function Home() {
     setPreviewUrl(null);
     setSymptoms([]);
     setResult(null);
-    setStep("upload");
+    setStep("home");
   };
 
   return (
     <Layout>
       <div className="container mx-auto px-4 py-12 max-w-3xl">
 
-        {/* ── UPLOAD ── */}
-        {step === "upload" && (
+        {/* ── HOME ── */}
+        {step === "home" && (
           <div className="flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in zoom-in duration-500">
             <div className="space-y-4 max-w-2xl">
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
-                <UploadCloud size={40} strokeWidth={1.5} className="text-primary" />
+                <Camera size={40} strokeWidth={1.5} className="text-primary" />
               </div>
               <h1 className="text-4xl md:text-5xl font-serif text-foreground leading-tight tracking-tight">
                 당신의 피부를 위한<br />정밀한 AI 진단
               </h1>
               <p className="text-lg text-muted-foreground font-light">
-                스마트폰 사진 한 장으로 시작하는 퍼스널 스킨케어 컨설팅.<br />
+                3방향 얼굴 스캔으로 시작하는 퍼스널 스킨케어 컨설팅.<br />
                 피부과 전문의의 시선으로 당신의 피부 상태를 분석합니다.
               </p>
             </div>
 
-            {/* AI 얼굴 스캔 (메인) */}
             <Card className="w-full max-w-xl border-2 border-primary/30 bg-gradient-to-b from-primary/5 to-card/80 hover:border-primary/50 transition-all cursor-pointer"
               onClick={() => setStep("camera")}
             >
@@ -154,43 +142,6 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* 구분선 */}
-            <div className="flex items-center gap-3 w-full max-w-xl">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-xs text-muted-foreground">또는</span>
-              <div className="flex-1 h-px bg-border" />
-            </div>
-
-            {/* 갤러리 업로드 (서브) */}
-            <Card className="w-full max-w-xl border-dashed border-2 bg-card/50 hover:bg-card/80 transition-colors">
-              <CardContent className="p-8 flex flex-col items-center justify-center space-y-4">
-                <div className="space-y-1 text-center">
-                  <h3 className="text-lg font-medium">갤러리에서 사진 선택</h3>
-                  <p className="text-xs text-muted-foreground">
-                    이미 찍어둔 사진이 있다면 업로드하세요.
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  data-testid="input-file"
-                />
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="rounded-full px-8 gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                  data-testid="button-upload"
-                >
-                  <ImagePlus size={18} />
-                  갤러리에서 선택
-                </Button>
-              </CardContent>
-            </Card>
-
             <p className="text-xs text-muted-foreground">
               AI 기반 피부 분석 · 전문의 진단 대체 불가
             </p>
@@ -201,7 +152,7 @@ export default function Home() {
         {step === "camera" && (
           <FaceCamera
             onCapture={handleCameraCapture}
-            onClose={() => setStep("upload")}
+            onClose={() => setStep("home")}
           />
         )}
 

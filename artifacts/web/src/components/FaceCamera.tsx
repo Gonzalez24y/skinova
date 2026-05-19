@@ -279,19 +279,8 @@ export default function FaceCamera({ onCapture, onClose }: FaceCameraProps) {
         setStatus("ready");
         setStatusMsg(PHASES[0].label);
 
-        // Auto torch for dark environments
-        setTimeout(() => {
-          if (!vid || vid.readyState < 2) return;
-          const tc = document.createElement("canvas");
-          tc.width = tc.height = 64;
-          const tctx = tc.getContext("2d");
-          if (!tctx) return;
-          tctx.drawImage(vid, 0, 0, 64, 64);
-          const d = tctx.getImageData(0, 0, 64, 64).data;
-          let sum = 0;
-          for (let i = 0; i < d.length; i += 4) sum += d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
-          if (sum / 4096 < 50) tryTorch(true);
-        }, 2000);
+        // Always turn on torch (flash) for better skin analysis
+        setTimeout(() => tryTorch(true), 500);
 
         fm.onResults((res: any) => {
           if (cancelRef.current) return;
