@@ -12,6 +12,11 @@ import { AuthSync } from "@/components/auth-sync";
 
 const queryClient = new QueryClient();
 
+interface ClerkConfig {
+  clerkPublishableKey: string;
+  proxyUrl: string | null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -24,19 +29,20 @@ function Router() {
 }
 
 function App() {
-  const [clerkKey, setClerkKey] = useState<string | null>(
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || null
-  );
-  const [loading, setLoading] = useState(!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+  const [config, setConfig] = useState<ClerkConfig | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (clerkKey) return;
     fetch("/api/config")
       .then((r) => r.json())
-      .then((data: { clerkPublishableKey: string }) => {
-        if (data.clerkPublishableKey) setClerkKey(data.clerkPublishableKey);
+      .then((data: ClerkConfig) => {
+        setConfig(data);
       })
-      .catch(() => {})
+      .catch(() => {
+        // fallback to env var if API call fails
+        const envKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+        if (envKey) setConfig({ clerkPublishableKey: envKey, proxyUrl: null });
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -48,24 +54,31 @@ function App() {
     );
   }
 
-  if (!clerkKey) {
+  if (!config?.clerkPublishableKey) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-2">
-          <p className="text-foreground font-medium">서비스 연결 중 문제가 발생했습니다.</p>
+        <div className="text-center space-y-4">
+          <p className="text-foreground font-medium">서비스에 연결할 수 없습니다.</p>
           <button
             className="text-sm text-primary underline"
             onClick={() => window.location.reload()}
           >
-            다시 시도
+            새로고침
           </button>
         </div>
       </div>
     );
   }
 
+  const clerkProps: Record<string, string> = {
+    publishableKey: config.clerkPublishableKey,
+  };
+  if (config.proxyUrl) {
+    clerkProps.proxyUrl = config.proxyUrl;
+  }
+
   return (
-    <ClerkProvider publishableKey={clerkKey}>
+    <ClerkProvider {...clerkProps}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
