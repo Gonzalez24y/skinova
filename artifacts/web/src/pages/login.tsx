@@ -8,7 +8,7 @@ export default function Login() {
           <h1 className="text-3xl font-serif text-foreground mb-2">Skinova</h1>
           <p className="text-muted-foreground">당신의 피부를 위한 AI 솔루션</p>
         </div>
-        <SignIn routing="path" path="/login" forceRedirectUrl="/" signUpForceRedirectUrl="/" />
+        <SignIn routing="hash" forceRedirectUrl="/" signUpForceRedirectUrl="/" />
       </div>
     </div>
   );
